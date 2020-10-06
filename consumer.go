@@ -83,11 +83,10 @@ func (c *Consumer) handleDisconnect() {
 
 // ConsumerOptions holds options for consumer setup
 type ConsumerOptions struct {
-	Name       string
-	Queue      string
-	RoutingKey string
-	AutoAck    bool
-	Exclusive  bool
+	Name      string // application-defined, e.g. executable name
+	Queue     string
+	AutoAck   bool
+	Exclusive bool
 }
 
 // Consume starts a new consumer

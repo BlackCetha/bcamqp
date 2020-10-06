@@ -12,11 +12,11 @@ import (
 
 // BrokerOptions holds options for broker setup
 type BrokerOptions struct {
-	Encrypted     bool
+	Encrypted     bool // Wether to use AMQPs
 	Address       string
 	User          string
 	Password      string
-	AutoTimestamp bool
+	AutoTimestamp bool // Wether to set the (unset) timestamp field when publishing messages
 }
 
 type connectionObserver interface {
@@ -24,7 +24,7 @@ type connectionObserver interface {
 	handleDisconnect()
 }
 
-// Broker wraps the complexities of the AMQP protocol
+// Broker represents a logical connection to a broker
 type Broker struct {
 	url                 string
 	isReady             bool
@@ -36,7 +36,9 @@ type Broker struct {
 	reconnectAttempts   int
 }
 
-// New returns a new broker instance
+// New configures a new Broker
+//
+// Connect needs to be called to use the instance
 func New(options BrokerOptions) *Broker {
 	amqpURL := url.URL{
 		Scheme: "amqp",
@@ -112,12 +114,14 @@ func (b *Broker) disconnectHandler(disconnectChan <-chan *amqp.Error) {
 }
 
 // Message is an AMQP message entity
+//
+// These fields are part of the AMQP standard or RabbitMQ extensions
 type Message struct {
 	Exchange      string
 	RoutingKey    string
 	Body          []byte
 	Headers       map[string]interface{}
-	Timestamp     time.Time
+	Timestamp     time.Time // application-defined, may be set to any value
 	ContentType   string
 	CorrelationID string
 	ReplyTo       string
@@ -178,11 +182,11 @@ func (b *Broker) Publish(msg Message) error {
 	)
 }
 
-// Close gracefully shuts down the broker connection
-func (b *Broker) Close() {
+// Close tries to gracefully shut down the broker connection
+func (b *Broker) Close() error {
 	b.isReady = false
 
-	b.conn.Close()
+	return b.conn.Close()
 }
 
 func (b *Broker) subscribe(obs connectionObserver) {

@@ -62,7 +62,7 @@ func (b *Broker) DeclareQueue(options QueueOptions) error {
 
 // BindingOptions holds options for binding creation
 type BindingOptions struct {
-	Name       string
+	Queue      string
 	RoutingKey string
 	Exchange   string
 }
@@ -70,7 +70,7 @@ type BindingOptions struct {
 // DeclareBinding creates a binding between an exchange and a queue
 func (b *Broker) DeclareBinding(options BindingOptions) error {
 	return b.mainChannel.QueueBind(
-		options.Name,       // name
+		options.Queue,      // name
 		options.RoutingKey, // key
 		options.Exchange,   // exchange
 		false,              // noWait
