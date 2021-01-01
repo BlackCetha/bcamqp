@@ -24,10 +24,20 @@ func (c *Consumer) Messages() <-chan Message {
 //
 // Trying to read from a closed consumer
 func (c *Consumer) Close() error {
+	// Our protocol library (github.com/streadway/amqp) will
+	// synchronize this call itself. We need to call this
+	// prior to acquiring the mutex via handleDisconnect()
+	// because on clean shutdown the message loop from
+	// startConsuming will still be running and holding
+	// the mutex. This will run the last batch of messages
+	// through it and then close the delivery channel itself.
+	// This in turn will allow startConsuming to return and
+	// release the mutex.
+	c.amqpChan.Cancel(c.options.Name, false)
+	
 	// Will acquire the mutex
 	c.handleDisconnect()
-
-	c.amqpChan.Cancel(c.options.Name, false)
+	
 	return c.amqpChan.Close()
 }
 
