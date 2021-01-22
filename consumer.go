@@ -150,7 +150,10 @@ func (b *Broker) Consume(options ConsumerOptions) (*Consumer, error) {
 	c.amqpChanUsed.Lock()
 
 	if b.isReady {
-		return c, c.handleConnect()
+		err := c.handleConnect()
+		if err != nil {
+			return nil, fmt.Errorf("start consuming: %w", err)
+		}
 	}
 
 	b.subscribe(c)
