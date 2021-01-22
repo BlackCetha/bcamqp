@@ -42,6 +42,10 @@ func (c *Consumer) Close() error {
 
 	close(c.messages)
 
+	for _, c := range c.errorChans {
+		close(c)
+	}
+
 	return c.amqpChan.Close()
 }
 
