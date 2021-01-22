@@ -20,7 +20,7 @@ type BrokerOptions struct {
 }
 
 type connectionObserver interface {
-	handleConnect()
+	handleConnect() error
 	handleDisconnect()
 }
 

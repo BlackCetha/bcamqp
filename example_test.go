@@ -53,12 +53,15 @@ func Example() {
 		log.Fatalf("publish: %v", err)
 	}
 
-	cons := broker.Consume(ConsumerOptions{
+	cons, err := broker.Consume(ConsumerOptions{
 		Name:      "bcamqp-example",
 		Queue:     "example-queue",
 		AutoAck:   false,
 		Exclusive: false,
 	})
+	if err != nil {
+		log.Fatalf("consume: %v", err)
+	}
 	defer cons.Close()
 
 	for msg := range cons.Messages() {

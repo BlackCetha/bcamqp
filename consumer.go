@@ -1,6 +1,7 @@
 package bcamqp
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/streadway/amqp"
@@ -10,6 +11,7 @@ import (
 type Consumer struct {
 	amqpChanUsed sync.Mutex
 	amqpChan     *amqp.Channel
+	errorChans   []chan error
 	messages     chan Message
 	options      ConsumerOptions
 	broker       *Broker
@@ -34,14 +36,24 @@ func (c *Consumer) Close() error {
 	// This in turn will allow startConsuming to return and
 	// release the mutex.
 	c.amqpChan.Cancel(c.options.Name, false)
-	
+
 	// Will acquire the mutex
 	c.handleDisconnect()
-	
+
+	close(c.messages)
+
 	return c.amqpChan.Close()
 }
 
-func (c *Consumer) startConsuming() {
+// ErrChan returns a channel that will emit consumer exceptions
+func (c *Consumer) ErrChan() <-chan error {
+	errChan := make(chan error)
+
+	c.errorChans = append(c.errorChans, errChan)
+	return errChan
+}
+
+func (c *Consumer) startConsuming(errChan chan<- error) {
 	c.amqpChanUsed.Lock()
 	defer c.amqpChanUsed.Unlock()
 
@@ -54,9 +66,25 @@ func (c *Consumer) startConsuming() {
 		false,
 		nil,
 	)
+	errChan <- err
 	if err != nil {
 		return
 	}
+
+	libErrChan := make(chan *amqp.Error, 1)
+	c.amqpChan.NotifyClose(libErrChan)
+
+	go func() {
+		err := <-libErrChan
+
+		if err == nil {
+			return
+		}
+
+		for _, c := range c.errorChans {
+			c <- err
+		}
+	}()
 
 	for msg := range deliveries {
 		c.messages <- Message{
@@ -75,16 +103,25 @@ func (c *Consumer) startConsuming() {
 	}
 }
 
-func (c *Consumer) handleConnect() {
+func (c *Consumer) handleConnect() error {
 	var err error
 	c.amqpChan, err = c.broker.conn.Channel()
 	if err != nil {
-		return
+		return fmt.Errorf("acquire channel: %w", err)
 	}
 
 	c.amqpChanUsed.Unlock()
 
-	go c.startConsuming()
+	errChan := make(chan error)
+
+	go c.startConsuming(errChan)
+
+	err = <-errChan
+	if err != nil {
+		return fmt.Errorf("consume: %w", err)
+	}
+
+	return nil
 }
 
 func (c *Consumer) handleDisconnect() {
@@ -100,7 +137,7 @@ type ConsumerOptions struct {
 }
 
 // Consume starts a new consumer
-func (b *Broker) Consume(options ConsumerOptions) *Consumer {
+func (b *Broker) Consume(options ConsumerOptions) (*Consumer, error) {
 	c := &Consumer{
 		options:  options,
 		broker:   b,
@@ -109,10 +146,10 @@ func (b *Broker) Consume(options ConsumerOptions) *Consumer {
 	c.amqpChanUsed.Lock()
 
 	if b.isReady {
-		c.handleConnect()
+		return nil, c.handleConnect()
 	}
 
 	b.subscribe(c)
 
-	return c
+	return c, nil
 }
