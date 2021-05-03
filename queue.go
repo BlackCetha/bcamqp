@@ -20,29 +20,7 @@ type Queue struct {
 
 func (q *Queue) Next() bool {
 	if q.channel == nil {
-		var err error
-		q.channel, err = q.b.connection.Channel()
-		if err != nil {
-			q.err = fmt.Errorf("open channel: %w", err)
-			return false
-		}
-
-		q.msgsChan, err = q.channel.Consume(
-			q.name,             // queue
-			q.consumerName,     // consumer
-			false,              // autoAck
-			q.consumeExclusive, // exclusive
-			false,              // noLocal
-			false,              // noWait
-			nil,                // args
-		)
-		if err != nil {
-			// an error here is most likely a channel-level exception and will
-			// close the channel anyway, make sure its closed and carry on
-			_ = q.channel.Close()
-			q.channel = nil
-
-			q.err = fmt.Errorf("begin consuming: %w", err)
+		if !q.beginConsuming() {
 			return false
 		}
 	}
@@ -92,11 +70,6 @@ func (q *Queue) Delete() error {
 }
 
 func (q *Queue) Close() error {
-	q.b.unregisterDisconnectListener(q)
-	return q.onDisconnect()
-}
-
-func (q *Queue) onDisconnect() error {
 	if q.channel == nil {
 		return nil
 	}
@@ -115,4 +88,34 @@ func (q *Queue) onDisconnect() error {
 	}
 
 	return nil
+}
+
+func (q *Queue) beginConsuming() bool {
+	var err error
+	q.channel, err = q.b.connection.Channel()
+	if err != nil {
+		q.err = fmt.Errorf("open channel: %w", err)
+		return false
+	}
+
+	q.msgsChan, err = q.channel.Consume(
+		q.name,             // queue
+		q.consumerName,     // consumer
+		false,              // autoAck
+		q.consumeExclusive, // exclusive
+		false,              // noLocal
+		false,              // noWait
+		nil,                // args
+	)
+	if err != nil {
+		// an error here is most likely a channel-level exception and will
+		// close the channel anyway, make sure its closed and carry on
+		_ = q.channel.Close()
+		q.channel = nil
+
+		q.err = fmt.Errorf("begin consuming: %w", err)
+		return false
+	}
+
+	return true
 }

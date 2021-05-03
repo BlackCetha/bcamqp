@@ -5,13 +5,14 @@ import (
 	"github.com/streadway/amqp"
 )
 
-var _ adaptor.Server = Streadway{}
+// make mistakes compile time errors
+var _ adaptor.Server = Server{}
 var _ adaptor.Connection = &Connection{}
 var _ adaptor.Channel = &amqp.Channel{}
 
-type Streadway struct{}
+type Server struct{}
 
-func (s Streadway) Dial(url string) (adaptor.Connection, error) {
+func (s Server) Dial(url string) (adaptor.Connection, error) {
 	conn, err := amqp.Dial(url)
 	return &Connection{conn: conn}, err
 }

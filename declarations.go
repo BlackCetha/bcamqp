@@ -34,7 +34,3 @@ type ExchangeOptions struct {
 	Type    ExchangeType
 	Durable bool
 }
-
-type disconnectListener interface {
-	onDisconnect() error
-}

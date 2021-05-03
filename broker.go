@@ -2,17 +2,15 @@ package bcamqp
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/blackcetha/bcamqp/adaptor"
 	"github.com/streadway/amqp"
 )
 
 type Broker struct {
-	connection          adaptor.Connection
-	mainChan            adaptor.Channel
-	disconnectListeners []disconnectListener
-	autoTimestamp       bool
+	connection    adaptor.Connection
+	mainChan      adaptor.Channel
+	autoTimestamp bool
 }
 
 func (b *Broker) open(url string, autoTimestamp bool, onClose func(err error)) error {
@@ -39,14 +37,6 @@ func (b *Broker) open(url string, autoTimestamp bool, onClose func(err error)) e
 	return nil
 }
 
-func (b *Broker) unregisterDisconnectListener(listener disconnectListener) {
-	for i := 0; i < len(b.disconnectListeners); i++ {
-		if b.disconnectListeners[i] == listener {
-			b.disconnectListeners = append(b.disconnectListeners[:i], b.disconnectListeners[i+1:]...)
-		}
-	}
-}
-
 func (b *Broker) GetExchange(options ExchangeOptions) (*Exchange, error) {
 	err := b.mainChan.ExchangeDeclare(
 		options.Name,         // name
@@ -69,7 +59,7 @@ func (b *Broker) GetExchange(options ExchangeOptions) (*Exchange, error) {
 
 func (b *Broker) GetQueue(options QueueOptions) (*Queue, error) {
 	serverdata, err := b.mainChan.QueueDeclare(
-		options.Name,      //
+		options.Name,      // name
 		options.Durable,   // durable
 		!options.Durable,  // autoDelete
 		options.Exclusive, // exclusive
@@ -89,35 +79,10 @@ func (b *Broker) GetQueue(options QueueOptions) (*Queue, error) {
 }
 
 func (b *Broker) Close() error {
-	var err error
-	var errs []error
-	for _, l := range b.disconnectListeners {
-		err = l.onDisconnect()
-		if err != nil {
-			errs = append(errs, err)
-		}
-	}
-
-	err = b.mainChan.Close()
+	err := b.connection.Close()
 	if err != nil {
-		errs = append(errs, fmt.Errorf("close main channel: %w", err))
+		return fmt.Errorf("close broker connection: %w", err)
 	}
 
-	err = b.connection.Close()
-	if err != nil {
-		errs = append(errs, fmt.Errorf("close broker connection: %w", err))
-	}
-
-	if len(errs) == 0 {
-		return nil
-	}
-
-	var out strings.Builder
-	for i := 0; i < len(errs)-1; i++ {
-		out.WriteString(errs[i].Error())
-		out.WriteString(", ")
-	}
-	out.WriteString(errs[len(errs)-1].Error())
-
-	return fmt.Errorf(out.String())
+	return nil
 }

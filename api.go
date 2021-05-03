@@ -8,7 +8,7 @@ import (
 	"github.com/blackcetha/bcamqp/adaptor/streadway"
 )
 
-var adaptorInstance adaptor.Server = streadway.Streadway{}
+var adaptorInstance adaptor.Server = streadway.Server{}
 
 func Open(options BrokerOptions, onClose func(err error)) (*Broker, error) {
 	amqpURL := url.URL{
