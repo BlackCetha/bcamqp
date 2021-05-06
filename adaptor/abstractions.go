@@ -1,17 +1,24 @@
+// Package adoptor provides abstraction of AMQP messaging libraries.
+// It is primarily used to introduce a mock during testing.
 package adaptor
 
 import "github.com/streadway/amqp"
 
+// Server wraps the library function used to connect to a broker
+// in a struct.
 type Server interface {
 	Dial(url string) (Connection, error)
 }
 
+// Connection wraps a broker connection.
 type Connection interface {
 	Channel() (Channel, error)
 	NotifyClose(receiver chan *amqp.Error) chan *amqp.Error
+	// Close needs to relay to all channels and consumers
 	Close() error
 }
 
+// Channel wraps the operations of a protocol primitive "channel".
 type Channel interface {
 	Cancel(consumer string, noWait bool) error
 	Close() error

@@ -50,8 +50,18 @@ func (e *Exchange) Send(msg Message) error {
 		expiration = strconv.FormatInt(msg.Expiration.Milliseconds(), 10)
 	}
 
+	exchange := e.name
+	if msg.Exchange != "" {
+		exchange = msg.Exchange
+	}
+
+	dmode := amqp.Persistent
+	if msg.Transient {
+		dmode = amqp.Transient
+	}
+
 	return e.b.mainChan.Publish(
-		msg.Exchange,
+		exchange,
 		msg.RoutingKey,
 		false,
 		false,
@@ -63,6 +73,7 @@ func (e *Exchange) Send(msg Message) error {
 			CorrelationId: msg.CorrelationID,
 			ReplyTo:       msg.ReplyTo,
 			Expiration:    expiration,
+			DeliveryMode:  dmode,
 		},
 	)
 }

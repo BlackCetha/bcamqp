@@ -37,7 +37,7 @@ func (b *Broker) open(url string, autoTimestamp bool, onClose func(err error)) e
 	return nil
 }
 
-func (b *Broker) GetExchange(options ExchangeOptions) (*Exchange, error) {
+func (b *Broker) Exchange(options ExchangeOptions) (*Exchange, error) {
 	err := b.mainChan.ExchangeDeclare(
 		options.Name,         // name
 		string(options.Type), // kind
@@ -57,7 +57,7 @@ func (b *Broker) GetExchange(options ExchangeOptions) (*Exchange, error) {
 	}, nil
 }
 
-func (b *Broker) GetQueue(options QueueOptions) (*Queue, error) {
+func (b *Broker) Queue(options QueueOptions) (*Queue, error) {
 	serverdata, err := b.mainChan.QueueDeclare(
 		options.Name,      // name
 		options.Durable,   // durable

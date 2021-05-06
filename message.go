@@ -15,6 +15,7 @@ type Message struct {
 	CorrelationID string
 	ReplyTo       string
 	Expiration    time.Duration
+	Transient     bool // store message in-mem only
 	ackFunc       func(bool) error
 	rejectFunc    func(bool) error
 	nackFunc      func(bool, bool) error

@@ -2,6 +2,7 @@ package bcamqp
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/blackcetha/bcamqp/adaptor"
 	"github.com/streadway/amqp"
@@ -19,6 +20,8 @@ type Queue struct {
 }
 
 func (q *Queue) Next() bool {
+	q.err = nil
+
 	if q.channel == nil {
 		if !q.beginConsuming() {
 			return false
@@ -26,6 +29,46 @@ func (q *Queue) Next() bool {
 	}
 
 	m, ok := <-q.msgsChan
+	if !ok {
+		return false
+	}
+
+	q.msg = &Message{
+		Exchange:      m.Exchange,
+		RoutingKey:    m.RoutingKey,
+		Body:          m.Body,
+		ContentType:   m.ContentType,
+		CorrelationID: m.CorrelationId,
+		Headers:       m.Headers,
+		ReplyTo:       m.ReplyTo,
+		Timestamp:     m.Timestamp,
+		ackFunc:       m.Ack,
+		rejectFunc:    m.Reject,
+		nackFunc:      m.Nack,
+	}
+
+	return true
+}
+
+func (q *Queue) NextWithTimeout(timeout time.Duration) bool {
+	q.err = nil
+
+	if q.channel == nil {
+		if !q.beginConsuming() {
+			return false
+		}
+	}
+
+	timeoutChan := time.After(timeout)
+
+	var m amqp.Delivery
+	var ok bool
+	select {
+	case m, ok = <-q.msgsChan:
+	case <-timeoutChan:
+		return false
+	}
+
 	if !ok {
 		return false
 	}

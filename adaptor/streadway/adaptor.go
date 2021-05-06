@@ -1,3 +1,4 @@
+// Package streadway is an adaptor for the de-facto standard AMQP library.
 package streadway
 
 import (
