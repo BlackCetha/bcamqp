@@ -38,6 +38,18 @@ func (b *Broker) open(url string, autoTimestamp bool, onClose func(err error)) e
 }
 
 func (b *Broker) Exchange(options ExchangeOptions) (*Exchange, error) {
+	// we need a special case for the default exchange since RabbitMQ
+	// won't let us declare it, even if the options are correct
+	if options.Name == "" {
+		if options.Durable != true || options.Type != Direct {
+			return nil, fmt.Errorf("invalid options for default exchange")
+		}
+
+		return &Exchange{
+			b:    b,
+			name: "",
+		}, nil
+	}
 	err := b.mainChan.ExchangeDeclare(
 		options.Name,         // name
 		string(options.Type), // kind

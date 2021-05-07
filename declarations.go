@@ -1,5 +1,7 @@
 package bcamqp
 
+import "github.com/streadway/amqp"
+
 // ExchangeType specifies the type of the exchange to be created
 type ExchangeType string
 
@@ -33,4 +35,26 @@ type ExchangeOptions struct {
 	Name    string
 	Type    ExchangeType
 	Durable bool
+}
+
+type propagationHeaders amqp.Table
+
+func (p propagationHeaders) Get(key string) string {
+	v, _ := p[key]
+	vstr, _ := v.(string)
+	return vstr // use default value
+}
+
+func (p propagationHeaders) Set(key, value string) {
+	p[key] = value
+}
+
+func (p propagationHeaders) Keys() []string {
+	out := make([]string, 0, len(p))
+
+	for k := range p {
+		out = append(out, k)
+	}
+
+	return out
 }

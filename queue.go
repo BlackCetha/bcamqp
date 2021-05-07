@@ -1,11 +1,13 @@
 package bcamqp
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/blackcetha/bcamqp/adaptor"
 	"github.com/streadway/amqp"
+	"go.opentelemetry.io/otel"
 )
 
 type Queue struct {
@@ -20,58 +22,44 @@ type Queue struct {
 }
 
 func (q *Queue) Next() bool {
-	q.err = nil
-
-	if q.channel == nil {
-		if !q.beginConsuming() {
-			return false
-		}
-	}
-
-	m, ok := <-q.msgsChan
-	if !ok {
-		return false
-	}
-
-	q.msg = &Message{
-		Exchange:      m.Exchange,
-		RoutingKey:    m.RoutingKey,
-		Body:          m.Body,
-		ContentType:   m.ContentType,
-		CorrelationID: m.CorrelationId,
-		Headers:       m.Headers,
-		ReplyTo:       m.ReplyTo,
-		Timestamp:     m.Timestamp,
-		ackFunc:       m.Ack,
-		rejectFunc:    m.Reject,
-		nackFunc:      m.Nack,
-	}
-
-	return true
+	_, ok := q.NextWithContext(context.Background())
+	return ok
 }
 
 func (q *Queue) NextWithTimeout(timeout time.Duration) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	_, ok := q.NextWithContext(ctx)
+
+	return ok
+}
+
+func (q *Queue) NextWithContext(ctx context.Context) (context.Context, bool) {
+	ctx, span := otel.GetTracerProvider().Tracer("github.com/blackcetha/bcamqp").Start(ctx, "NextWithContext")
+	defer span.End()
+
 	q.err = nil
 
 	if q.channel == nil {
 		if !q.beginConsuming() {
-			return false
+			return ctx, false
 		}
 	}
-
-	timeoutChan := time.After(timeout)
 
 	var m amqp.Delivery
 	var ok bool
 	select {
 	case m, ok = <-q.msgsChan:
-	case <-timeoutChan:
-		return false
+		if !ok {
+			return ctx, false
+		}
+	case <-ctx.Done():
+		q.err = ctx.Err()
+		return ctx, false
 	}
 
-	if !ok {
-		return false
-	}
+	ctx = otel.GetTextMapPropagator().Extract(ctx, propagationHeaders(m.Headers))
 
 	q.msg = &Message{
 		Exchange:      m.Exchange,
@@ -87,7 +75,7 @@ func (q *Queue) NextWithTimeout(timeout time.Duration) bool {
 		nackFunc:      m.Nack,
 	}
 
-	return true
+	return ctx, true
 }
 
 func (q *Queue) Message() *Message {

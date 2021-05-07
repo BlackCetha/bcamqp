@@ -1,11 +1,13 @@
 package bcamqp
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/streadway/amqp"
+	"go.opentelemetry.io/otel"
 )
 
 type Exchange struct {
@@ -40,7 +42,13 @@ func (e *Exchange) Unbind(q *Queue, key string) error {
 
 	return nil
 }
-func (e *Exchange) Send(msg Message) error {
+
+// Send publishes a message to the exchange.
+//
+// If you're using the OpenTelemetry integration, specific headers will always
+// be set and may override your own. Check the Inject method here:
+// https://github.com/open-telemetry/opentelemetry-go/blob/main/propagation/trace_context.go
+func (e *Exchange) Send(ctx context.Context, msg Message) error {
 	if e.b.autoTimestamp && msg.Timestamp.IsZero() {
 		msg.Timestamp = time.Now()
 	}
@@ -50,18 +58,15 @@ func (e *Exchange) Send(msg Message) error {
 		expiration = strconv.FormatInt(msg.Expiration.Milliseconds(), 10)
 	}
 
-	exchange := e.name
-	if msg.Exchange != "" {
-		exchange = msg.Exchange
-	}
-
 	dmode := amqp.Persistent
 	if msg.Transient {
 		dmode = amqp.Transient
 	}
 
+	otel.GetTextMapPropagator().Inject(ctx, propagationHeaders(msg.Headers))
+
 	return e.b.mainChan.Publish(
-		exchange,
+		e.name,
 		msg.RoutingKey,
 		false,
 		false,
